@@ -61,8 +61,11 @@ class WikipediaArmenianHistoryScraper(BaseScraper):
         if not content_div:
             return None
 
+        from bs4 import Tag
         paragraphs = []
         for el in content_div.children:
+            if not isinstance(el, Tag):
+                continue
             if el.name == "h2":  # Stop at first section
                 break
             if el.name == "p":
@@ -109,7 +112,7 @@ class HyestartScraper(BaseScraper):
         articles: list[ScrapedArticle] = []
         # Collect links that seem to be article pages
         for a_tag in soup.find_all("a", href=True):
-            href = a_tag["href"]
+            href = str(a_tag["href"])
             text = self.clean_text(a_tag.get_text())
             if len(text) < 15 or len(text) > 300:
                 continue
