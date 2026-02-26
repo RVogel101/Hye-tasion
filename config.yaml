@@ -1,0 +1,98 @@
+scraping:
+  # Armenian news sources
+  news_sources:
+    - name: "Armenpress"
+      url: "https://armenpress.am/eng/news/"
+      rss: "https://armenpress.am/eng/rss/news/"
+      type: rss
+      category: news
+    - name: "Asbarez"
+      url: "https://asbarez.com"
+      rss: "https://asbarez.com/feed/"
+      type: rss
+      category: news
+    - name: "Armenian Weekly"
+      url: "https://armenianweekly.com"
+      rss: "https://armenianweekly.com/feed/"
+      type: rss
+      category: news
+    - name: "Azatutyun (RFE/RL Armenia)"
+      url: "https://www.azatutyun.am/api/epiqq"
+      rss: "https://www.azatutyun.am/api/zijrreypui"
+      type: rss
+      category: news
+    - name: "Hetq"
+      url: "https://hetq.am/en/news"
+      rss: "https://hetq.am/en/rss"
+      type: rss
+      category: investigative
+    - name: "Panorama.am"
+      url: "https://www.panorama.am/en/news/"
+      rss: "https://www.panorama.am/en/rss/news.xml"
+      type: rss
+      category: news
+    - name: "EVN Report"
+      url: "https://evnreport.com"
+      rss: "https://evnreport.com/feed/"
+      type: rss
+      category: analysis
+    - name: "OC Media"
+      url: "https://oc-media.org"
+      rss: "https://oc-media.org/feed/"
+      type: rss
+      category: news
+
+  # History & academic sources
+  history_sources:
+    - name: "Hyestart"
+      url: "https://www.hyestart.am"
+      type: html
+      category: history
+    - name: "Armenian History Wikipedia"
+      url: "https://en.wikipedia.org/wiki/History_of_Armenia"
+      type: html
+      category: history
+    - name: "Armenian Studies Program - CSU Fresno"
+      url: "https://armenianstudies.csufresno.edu/history/"
+      type: html
+      category: academic
+    - name: "Civilnet"
+      url: "https://www.civilnet.am/en/"
+      rss: "https://www.civilnet.am/en/feed/"
+      type: rss
+      category: culture
+
+reddit:
+  # Subreddits to scrape for engagement analysis
+  analysis_subreddits:
+    - armenia
+    - hayastan
+    - armenianhistory
+    - history
+    - worldnews
+    - europe
+    - geopolitics
+    - caucasus
+
+  # Posts to fetch per subreddit per analysis cycle
+  posts_per_subreddit: 100
+  # Minimum score to include in training data
+  min_score_threshold: 10
+  # Time filters: hour, day, week, month, year, all
+  time_filter: month
+
+post_generation:
+  # Minimum content length to generate a post from (characters)
+  min_content_length: 200
+  # Maximum post ideas to generate per cycle
+  max_ideas_per_cycle: 20
+  # Post title max length (Reddit limit is 300)
+  max_title_length: 280
+
+ab_testing:
+  # Number of variants to generate per post idea
+  variants_per_post: 2
+  # Minimum sample size before declaring winner
+  min_sample_size: 30
+  # Statistical significance threshold
+  significance_threshold: 0.05

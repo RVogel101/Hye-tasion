@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hye-tasion — Armenian Reddit Post Generator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>🇦🇲 Hye-tasion</h1>
+      <p class="subtitle">Armenian Reddit Post Generator</p>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="nav-btn" data-tab="ideas">Post Ideas</button>
+      <button class="nav-btn" data-tab="abtests">A/B Tests</button>
+      <button class="nav-btn" data-tab="analysis">Engagement Analysis</button>
+      <button class="nav-btn" data-tab="sources">Sources</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ── DASHBOARD ───────────────────────────────────── -->
+    <section id="tab-dashboard" class="tab active">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="stat-sources">—</div><div class="stat-label">Sources</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-articles">—</div><div class="stat-label">Articles Scraped</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">Ideas Pending</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-posted">—</div><div class="stat-label">Posts Live</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-abtests">—</div><div class="stat-label">Active A/B Tests</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-reddit-posts">—</div><div class="stat-label">Reddit Posts Analyzed</div></div>
+      </div>
+
+      <div class="action-row">
+        <h2>Quick Actions</h2>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-scrape-all">🔄 Scrape All Sources</button>
+          <button class="btn btn-secondary" id="btn-collect-reddit">📊 Collect Reddit Data</button>
+          <button class="btn btn-secondary" id="btn-run-analysis">📈 Run Engagement Analysis</button>
+          <button class="btn btn-accent" id="btn-generate-ideas">💡 Generate Post Ideas</button>
+        </div>
+        <div id="action-status" class="status-msg hidden"></div>
+      </div>
+
+      <div class="section-card">
+        <h2>Recommendations for r/<span id="rec-subreddit">armenia</span></h2>
+        <div id="recommendations-list"><p class="muted">Run engagement analysis to see recommendations.</p></div>
+      </div>
+    </section>
+
+    <!-- ── POST IDEAS ──────────────────────────────────── -->
+    <section id="tab-ideas" class="tab">
+      <div class="toolbar">
+        <h2>Post Ideas</h2>
+        <div class="toolbar-controls">
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            <option value="pending" selected>Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="posted">Posted</option>
+          </select>
+          <button class="btn btn-accent" id="btn-generate-ideas-2">💡 Generate More</button>
+        </div>
+      </div>
+      <div id="ideas-list" class="card-list"><p class="muted">No ideas loaded yet.</p></div>
+      <div class="pagination" id="ideas-pagination"></div>
+    </section>
+
+    <!-- ── A/B TESTS ───────────────────────────────────── -->
+    <section id="tab-abtests" class="tab">
+      <div class="toolbar">
+        <h2>A/B Tests</h2>
+      </div>
+      <div id="abtests-list" class="card-list"><p class="muted">No A/B tests yet.</p></div>
+    </section>
+
+    <!-- ── ENGAGEMENT ANALYSIS ─────────────────────────── -->
+    <section id="tab-analysis" class="tab">
+      <div class="toolbar">
+        <h2>Engagement Analysis</h2>
+        <div class="toolbar-controls">
+          <input id="analysis-subreddit" placeholder="Subreddit (e.g. armenia)" value="armenia" />
+          <button class="btn btn-primary" id="btn-show-patterns">Show Patterns</button>
+          <button class="btn btn-secondary" id="btn-top-posts">Top Posts</button>
+        </div>
+      </div>
+      <div id="analysis-content">
+        <p class="muted">Select a subreddit and click "Show Patterns".</p>
+      </div>
+    </section>
+
+    <!-- ── SOURCES ─────────────────────────────────────── -->
+    <section id="tab-sources" class="tab">
+      <div class="toolbar"><h2>Scraped Sources</h2></div>
+      <div id="sources-list" class="card-list"><p class="muted">Loading…</p></div>
+    </section>
+  </main>
+
+  <!-- ── MODAL ──────────────────────────────────────────── -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-box">
+      <div id="modal-header">
+        <h3 id="modal-title">Post Idea</h3>
+        <button id="modal-close">✕</button>
+      </div>
+      <div id="modal-body"></div>
+      <div id="modal-footer"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

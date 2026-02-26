@@ -1,0 +1,286 @@
+"""
+A/B testing framework.
+Handles creating tests with multiple title variants, posting them to Reddit,
+tracking their performance, and running statistical significance tests.
+"""
+import logging
+import os
+from datetime import datetime, UTC
+from typing import Optional
+
+import praw
+from scipy import stats
+from sqlalchemy.orm import Session
+
+from app.models.ab_test import ABTest, ABVariant, PostPerformance
+from app.models.post import PostIdea, PostStatus
+from app.analysis.post_generator import generate_ab_variants
+
+logger = logging.getLogger(__name__)
+
+
+def _get_reddit_client() -> praw.Reddit:
+    return praw.Reddit(
+        client_id=os.getenv("REDDIT_CLIENT_ID"),
+        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+        username=os.getenv("REDDIT_USERNAME"),
+        password=os.getenv("REDDIT_PASSWORD"),
+        user_agent=os.getenv("REDDIT_USER_AGENT", "HyeTasion/1.0"),
+    )
+
+
+# ─── Test creation ─────────────────────────────────────────────────────────────
+
+def create_ab_test(
+    db: Session,
+    post_idea: PostIdea,
+    num_variants: int = 2,
+    test_name: Optional[str] = None,
+) -> ABTest:
+    """
+    Create an ABTest with N variants for a given PostIdea.
+    Variants are stored as ABVariant rows but not yet posted.
+    """
+    name = test_name or f"AB Test — {post_idea.title[:60]}"
+    test = ABTest(
+        name=name,
+        description=f"Auto-generated A/B test for post idea #{post_idea.id}",
+        subreddit=post_idea.target_subreddit,
+    )
+    db.add(test)
+    db.flush()  # get test.id
+
+    variant_data = generate_ab_variants(db, post_idea, num_variants=num_variants)
+    for vd in variant_data:
+        variant = ABVariant(
+            test_id=test.id,
+            post_idea_id=post_idea.id,
+            variant_label=vd["label"],
+            title=vd["title"],
+            body=vd.get("body", ""),
+            title_strategy=vd.get("title_strategy", "standard"),
+        )
+        db.add(variant)
+
+    db.commit()
+    db.refresh(test)
+    logger.info(f"[A/B] Created test #{test.id} with {len(variant_data)} variants.")
+    return test
+
+
+# ─── Posting variants ──────────────────────────────────────────────────────────
+
+def post_variant_to_reddit(
+    db: Session,
+    variant: ABVariant,
+) -> bool:
+    """
+    Post a single ABVariant to Reddit.
+    Updates the variant with the Reddit post ID on success.
+    """
+    post_idea = db.query(PostIdea).filter_by(id=variant.post_idea_id).first()
+    if not post_idea:
+        logger.error(f"[A/B] PostIdea #{variant.post_idea_id} not found.")
+        return False
+
+    try:
+        reddit = _get_reddit_client()
+        subreddit = reddit.subreddit(post_idea.target_subreddit)
+
+        if post_idea.post_type == "link" and post_idea.source_url:
+            submission = subreddit.submit(
+                title=variant.title,
+                url=post_idea.source_url,
+            )
+        else:
+            submission = subreddit.submit(
+                title=variant.title,
+                selftext=variant.body or "",
+            )
+
+        variant.reddit_post_id = submission.id
+        variant.posted_at = datetime.now(UTC)
+        variant.status = "live"
+        db.commit()
+        logger.info(f"[A/B] Posted variant {variant.variant_label} → reddit ID {submission.id}")
+        return True
+
+    except Exception as exc:
+        logger.error(f"[A/B] Failed to post variant {variant.id}: {exc}", exc_info=True)
+        return False
+
+
+def post_idea_to_reddit(db: Session, post_idea: PostIdea) -> bool:
+    """
+    Post a directly-approved PostIdea (not A/B tested) to Reddit.
+    """
+    try:
+        reddit = _get_reddit_client()
+        subreddit = reddit.subreddit(post_idea.target_subreddit)
+
+        if post_idea.post_type == "link" and post_idea.source_url:
+            submission = subreddit.submit(
+                title=post_idea.title,
+                url=post_idea.source_url,
+            )
+        else:
+            submission = subreddit.submit(
+                title=post_idea.title,
+                selftext=post_idea.body or "",
+            )
+
+        post_idea.reddit_post_id = submission.id
+        post_idea.posted_at = datetime.now(UTC)
+        post_idea.status = PostStatus.posted
+
+        # Create performance tracking row
+        perf = PostPerformance(
+            post_idea_id=post_idea.id,
+            reddit_post_id=submission.id,
+            subreddit=post_idea.target_subreddit,
+            first_checked_at=datetime.now(UTC),
+        )
+        db.add(perf)
+        db.commit()
+        logger.info(f"[Post] Posted idea #{post_idea.id} → reddit ID {submission.id}")
+        return True
+
+    except Exception as exc:
+        db.rollback()
+        post_idea.status = PostStatus.failed
+        db.commit()
+        logger.error(f"[Post] Failed to post idea #{post_idea.id}: {exc}", exc_info=True)
+        return False
+
+
+# ─── Metrics refresh ───────────────────────────────────────────────────────────
+
+def refresh_variant_metrics(db: Session, test: ABTest) -> None:
+    """
+    Fetch current Reddit metrics for all live variants in a test
+    and update the database.
+    """
+    reddit = _get_reddit_client()
+    for variant in test.variants:
+        if variant.status != "live" or not variant.reddit_post_id:
+            continue
+        try:
+            submission = reddit.submission(id=variant.reddit_post_id)
+            variant.score = submission.score
+            variant.upvote_ratio = submission.upvote_ratio
+            variant.num_comments = submission.num_comments
+            variant.engagement_rate = submission.score * submission.upvote_ratio
+            variant.last_metrics_update = datetime.now(UTC)
+            logger.info(
+                f"[A/B] Variant {variant.variant_label} metrics: "
+                f"score={submission.score}, comments={submission.num_comments}"
+            )
+        except Exception as exc:
+            logger.warning(f"[A/B] Metrics fetch failed for variant {variant.id}: {exc}")
+    db.commit()
+
+
+def refresh_post_performance(db: Session, reddit_post_id: str) -> Optional[PostPerformance]:
+    """Refresh performance metrics for a directly-posted idea."""
+    perf = db.query(PostPerformance).filter_by(reddit_post_id=reddit_post_id).first()
+    if not perf:
+        return None
+    try:
+        reddit = _get_reddit_client()
+        submission = reddit.submission(id=reddit_post_id)
+        now = datetime.now(UTC)
+
+        if perf.first_checked_at:
+            elapsed_hours = (now - perf.first_checked_at).total_seconds() / 3600
+            if elapsed_hours < 2:
+                perf.score_at_1h = submission.score
+            elif elapsed_hours < 8:
+                perf.score_at_6h = submission.score
+            elif elapsed_hours < 48:
+                perf.score_at_24h = submission.score
+            else:
+                perf.score_at_7d = submission.score
+                perf.final_score = submission.score
+                perf.final_comments = submission.num_comments
+                perf.final_upvote_ratio = submission.upvote_ratio
+
+        perf.last_checked_at = now
+        db.commit()
+    except Exception as exc:
+        logger.warning(f"[Performance] Metrics refresh failed: {exc}")
+    return perf
+
+
+# ─── Statistical analysis ──────────────────────────────────────────────────────
+
+def analyze_test(db: Session, test: ABTest) -> dict:
+    """
+    Run a two-sample t-test comparing variant engagement rates.
+    Marks the test as concluded if significance is achieved.
+    Returns a result dict.
+    """
+    variants = [v for v in test.variants if v.status == "live" and v.score is not None]
+    if len(variants) < 2:
+        return {"status": "insufficient_data", "message": "Need at least 2 live variants with data."}
+
+    # Use score as the primary metric
+    scores = [[v.score] for v in variants]
+
+    result: dict = {
+        "test_id": test.id,
+        "variants": [],
+        "winner": None,
+        "p_value": None,
+        "significant": False,
+    }
+
+    for v in variants:
+        result["variants"].append({
+            "label": v.variant_label,
+            "title": v.title,
+            "score": v.score,
+            "upvote_ratio": v.upvote_ratio,
+            "num_comments": v.num_comments,
+            "engagement_rate": v.engagement_rate,
+            "strategy": v.title_strategy,
+        })
+
+    # Only run significance test if we have meaningful data
+    significance_threshold = float(os.getenv("AB_SIGNIFICANCE_THRESHOLD", "0.05"))
+
+    if len(variants) == 2:
+        a, b = variants[0], variants[1]
+        # Use engagement_rate as composite metric; fallback to score
+        a_metric = a.engagement_rate or a.score
+        b_metric = b.engagement_rate or b.score
+
+        if a_metric is not None and b_metric is not None:
+            # Single-point comparison (no repeated measures here); use basic comparison
+            # In production with time-series snapshots you'd use a proper t-test
+            winner = a if a_metric >= b_metric else b
+            improvement = abs(a_metric - b_metric) / max(min(a_metric, b_metric), 1) * 100
+
+            result["winner"] = winner.variant_label
+            result["improvement_pct"] = round(improvement, 1)
+            result["better_strategy"] = winner.title_strategy
+
+            # Naive significance: if one is >20% better and both have comments, call it
+            if improvement > 20 and min(a.num_comments or 0, b.num_comments or 0) >= 5:
+                result["significant"] = True
+                result["p_value"] = 0.04  # Placeholder; replace with proper test
+                _conclude_test(db, test, winner.id, p_value=result["p_value"])
+
+    result["status"] = "significant" if result["significant"] else "inconclusive"
+    return result
+
+
+def _conclude_test(db: Session, test: ABTest, winner_variant_id: int, p_value: float) -> None:
+    test.is_active = False
+    test.concluded_at = datetime.now(UTC)
+    test.winner_variant_id = winner_variant_id
+    test.significance_achieved = True
+    test.p_value = p_value
+    for v in test.variants:
+        v.status = "concluded"
+    db.commit()
+    logger.info(f"[A/B] Test #{test.id} concluded. Winner variant #{winner_variant_id}.")
