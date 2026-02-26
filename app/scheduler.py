@@ -71,7 +71,8 @@ def _metrics_job():
             PostPerformance.final_score.is_(None)
         ).all()
         for perf in performances:
-            refresh_post_performance(db, perf.reddit_post_id)
+            # reddit_post_id may be a Column object; coerce to str
+            refresh_post_performance(db, str(perf.reddit_post_id))
     except Exception as exc:
         logger.error(f"[Scheduler] Metrics job failed: {exc}", exc_info=True)
     finally:
