@@ -85,7 +85,8 @@ def list_sources(db: Session = Depends(get_db)):
             "category": s.category,
             "is_active": s.is_active,
             "article_count": s.article_count,
-            "last_scraped_at": s.last_scraped_at.isoformat() if s.last_scraped_at else None,
+            # avoid truthiness on Column[datetime]
+            "last_scraped_at": s.last_scraped_at.isoformat() if s.last_scraped_at is not None else None,
         }
         for s in sources
     ]
@@ -143,8 +144,9 @@ def list_articles(
                 "source_id": a.source_id,
                 "category": a.category,
                 "summary": a.summary,
-                "published_at": a.published_at.isoformat() if a.published_at else None,
-                "scraped_at": a.scraped_at.isoformat() if a.scraped_at else None,
+                # avoid truthiness on Column[datetime]
+                "published_at": a.published_at.isoformat() if a.published_at is not None else None,
+                "scraped_at": a.scraped_at.isoformat() if a.scraped_at is not None else None,
                 "is_processed": a.is_processed,
             }
             for a in articles
@@ -188,11 +190,11 @@ def update_post_idea(idea_id: int, body: PostIdeaUpdate, db: Session = Depends(g
     if body.title is not None:
         if len(body.title) > 300:
             raise HTTPException(status_code=422, detail="Title exceeds 300 character Reddit limit")
-        idea.title = body.title
+        idea.title = body.title  # type: ignore[assignment]
     if body.body is not None:
-        idea.body = body.body
+        idea.body = body.body  # type: ignore[assignment]
     if body.notes is not None:
-        idea.notes = body.notes
+        idea.notes = body.notes  # type: ignore[assignment]
     db.commit()
     return _post_idea_dict(idea)
 
@@ -213,8 +215,8 @@ def approve_post_idea(
     if idea.status not in (PostStatus.pending, PostStatus.rejected):
         raise HTTPException(status_code=400, detail=f"Idea is already '{idea.status}'")
 
-    idea.status = PostStatus.approved
-    idea.reviewed_at = datetime.now(UTC)
+    idea.status = PostStatus.approved  # type: ignore[assignment]
+    idea.reviewed_at = datetime.now(UTC)  # type: ignore[assignment]
     db.commit()
 
     response = {"status": "approved", "idea_id": idea_id}
@@ -235,10 +237,10 @@ def reject_post_idea(idea_id: int, body: PostIdeaReject, db: Session = Depends(g
     idea = db.query(PostIdea).filter_by(id=idea_id).first()
     if not idea:
         raise HTTPException(status_code=404, detail="Post idea not found")
-    idea.status = PostStatus.rejected
-    idea.reviewed_at = datetime.now(UTC)
+    idea.status = PostStatus.rejected  # type: ignore[assignment]
+    idea.reviewed_at = datetime.now(UTC)  # type: ignore[assignment]
     if body.reason:
-        idea.notes = body.reason
+        idea.notes = body.reason  # type: ignore[assignment]
     db.commit()
     return {"status": "rejected", "idea_id": idea_id}
 
@@ -270,9 +272,10 @@ def _post_idea_dict(idea: PostIdea) -> dict:
         "generation_method": idea.generation_method,
         "predicted_engagement_score": idea.predicted_engagement_score,
         "notes": idea.notes,
-        "generated_at": idea.generated_at.isoformat() if idea.generated_at else None,
-        "reviewed_at": idea.reviewed_at.isoformat() if idea.reviewed_at else None,
-        "posted_at": idea.posted_at.isoformat() if idea.posted_at else None,
+        # avoid truthiness on Column[datetime]
+        "generated_at": idea.generated_at.isoformat() if idea.generated_at is not None else None,
+        "reviewed_at": idea.reviewed_at.isoformat() if idea.reviewed_at is not None else None,
+        "posted_at": idea.posted_at.isoformat() if idea.posted_at is not None else None,
         "reddit_post_id": idea.reddit_post_id,
         "article_id": idea.article_id,
     }
@@ -338,8 +341,9 @@ def _ab_test_dict(test: ABTest, include_variants: bool = False) -> dict:
         "significance_achieved": test.significance_achieved,
         "p_value": test.p_value,
         "winner_variant_id": test.winner_variant_id,
-        "created_at": test.created_at.isoformat() if test.created_at else None,
-        "concluded_at": test.concluded_at.isoformat() if test.concluded_at else None,
+        # avoid truthiness on Column[datetime]
+        "created_at": test.created_at.isoformat() if test.created_at is not None else None,
+        "concluded_at": test.concluded_at.isoformat() if test.concluded_at is not None else None,
     }
     if include_variants:
         d["variants"] = [
@@ -422,7 +426,8 @@ def list_reddit_posts(
                 "has_numbers": p.has_numbers,
                 "title_word_count": p.title_word_count,
                 "sentiment_score": p.sentiment_score,
-                "created_utc": p.created_utc.isoformat() if p.created_utc else None,
+                # avoid truthiness on Column[datetime]
+                "created_utc": p.created_utc.isoformat() if p.created_utc is not None else None,
             }
             for p in posts
         ],
