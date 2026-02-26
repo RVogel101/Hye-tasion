@@ -3,7 +3,7 @@ __pycache__/
 *.pyo
 *.db
 *.env
-*.env.*
+*\Hye-tasion\.env.example
 *.egg-info/
 dist/
 build/
