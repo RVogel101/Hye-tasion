@@ -115,3 +115,46 @@ Key settings in `.env`:
 - `TARGET_SUBREDDIT` — The subreddit to post to (default: `armenia`)
 - `ANALYSIS_SUBREDDITS` — Comma-separated list of subreddits to analyze for engagement patterns
 - `SCRAPE_INTERVAL_MINUTES` — How often to auto-scrape (default: 60)
+
+## Reddit API Compliance
+
+This project uses the Reddit API under the [Reddit Developer Terms](https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy) and the [Reddit Data API Terms](https://support.reddithelp.com/hc/en-us/articles/18591005200404). Below is a summary of the key terms and how Hye-tasion complies.
+
+### Developer Terms Summary
+
+| Area | Requirement | How We Comply |
+|------|-------------|---------------|
+| **Registration** | Valid Reddit account in good standing; keep API credentials secure | Credentials stored in `.env` (never committed); script-type app |
+| **Allowed Use** | Non-exclusive, revocable license for API access; attribute User Content with links and usernames | Reddit posts displayed with permalink and `u/author` attribution |
+| **No Commercial Use** | Don't monetize Reddit data or use it in paid services without a separate agreement | Hye-tasion is a personal/community tool with no monetization |
+| **No AI/ML Training** | Don't use Reddit data to train models without permission | Only statistical pattern analysis (percentiles, keyword frequency); no model training |
+| **Rate Limits** | Don't circumvent or exceed rate limits | PRAW handles `X-Ratelimit-*` headers; app adds delays between submissions |
+| **Content Removal** | Delete local copies if content is removed from Reddit | Scheduled cleanup job checks for removed/deleted posts and purges stale data |
+| **No Spam** | Don't spam or harass users | Posting cooldowns, sequential variant posting with delays, daily caps per subreddit |
+| **User Agent** | Properly identify your bot | Format: `script:HyeTasion:1.0 (by /u/username)` |
+| **Privacy** | Comply with data protection laws; don't share Reddit data with third parties | Data stays local in SQLite; no third-party sharing |
+| **Termination** | Reddit can revoke access at any time; delete all data if terminated | All Reddit data stored in a single DB; can be wiped cleanly |
+| **Liability** | Reddit provides everything "as-is"; max liability $100; you indemnify Reddit | Acknowledged — personal use tool |
+
+### Data API Terms Summary
+
+| Area | Requirement | How We Comply |
+|------|-------------|---------------|
+| **User Content license** | May copy and display User Content; may only modify to format for display | We display titles/scores as-is; formatting only for HTML rendering |
+| **No AI/ML training** | Cannot use User Content to train ML/AI models without rightsholder permission | No model training; engagement analysis uses only statistical aggregation |
+| **No commercial use** | Cannot sell, lease, sublicense, or derive revenue from Data APIs without written approval | Non-commercial personal/community project |
+| **OAuth required** | Must use OAuth tokens; must not misrepresent user agent or OAuth identity | PRAW handles OAuth; user agent set per Reddit's format |
+| **Attribution** | Must display "for Reddit" branding (e.g., "HyeTasion for Reddit") | Shown in frontend header and footer |
+| **Rate limits** | Reddit can set and enforce limits; exceeding can result in permanent revocation | PRAW rate limiter + application-level cooldowns |
+| **On termination** | Must delete all cached User Content, Materials, **and derived data/models** | Cleanup job purges raw posts + derived fields; DB can be wiped entirely |
+| **Third-party libraries** | Must comply with PRAW's own terms when using it | PRAW used per its BSD license terms |
+| **Confidentiality** | Protect any Reddit confidential information | No Reddit confidential info stored or shared |
+| **Future fees** | Reddit reserves the right to charge for API access | Acknowledged; will comply if pricing is introduced |
+
+### Compliance Controls
+
+- **Rate limiting** — PRAW's built-in rate limiter + configurable delays between posts (`POSTING_COOLDOWN_SECONDS` in `.env`)
+- **Attribution** — "for Reddit" branding in frontend header/footer; collected Reddit posts include author and permalink linking back to original content
+- **Data retention** — Background job periodically checks stored posts against Reddit and removes deleted/suspended content; configurable retention period via `DATA_RETENTION_DAYS`
+- **Spam prevention** — Minimum interval between submissions, daily posting cap per subreddit, duplicate-post detection
+- **Credential security** — All secrets in `.env` (gitignored), never hardcoded
