@@ -5,11 +5,13 @@ tracking their performance, and running statistical significance tests.
 """
 import logging
 import os
-from datetime import datetime, UTC
+import time
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 
 import praw
 from scipy import stats
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.ab_test import ABTest, ABVariant, PostPerformance
@@ -18,6 +20,10 @@ from app.analysis.post_generator import generate_ab_variants
 
 logger = logging.getLogger(__name__)
 
+# Spam-prevention settings (Reddit Developer Terms compliance)
+POSTING_COOLDOWN_SECONDS = int(os.getenv("POSTING_COOLDOWN_SECONDS", "600"))
+DAILY_POST_LIMIT = int(os.getenv("DAILY_POST_LIMIT", "5"))
+
 
 def _get_reddit_client() -> praw.Reddit:
     return praw.Reddit(
@@ -25,8 +31,47 @@ def _get_reddit_client() -> praw.Reddit:
         client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
         username=os.getenv("REDDIT_USERNAME"),
         password=os.getenv("REDDIT_PASSWORD"),
-        user_agent=os.getenv("REDDIT_USER_AGENT", "HyeTasion/1.0"),
+        user_agent=os.getenv("REDDIT_USER_AGENT", "script:HyeTasion:1.0 (by /u/unknown)"),
     )
+
+
+def _check_posting_allowed(db: Session, subreddit: str) -> tuple[bool, str]:
+    """
+    Enforce posting cooldown and daily limit per subreddit.
+    Returns (allowed, reason) — required by Reddit Developer Terms (no spam).
+    """
+    now = datetime.now(UTC)
+
+    # Check cooldown: most recent post to this subreddit
+    last_post = (
+        db.query(PostIdea)
+        .filter(
+            PostIdea.target_subreddit == subreddit,
+            PostIdea.posted_at.isnot(None),
+        )
+        .order_by(PostIdea.posted_at.desc())
+        .first()
+    )
+    if last_post and last_post.posted_at is not None:
+        elapsed = (now - last_post.posted_at).total_seconds()
+        if elapsed < POSTING_COOLDOWN_SECONDS:
+            remaining = int(POSTING_COOLDOWN_SECONDS - elapsed)
+            return False, f"Posting cooldown: wait {remaining}s before posting to r/{subreddit} again."
+
+    # Check daily limit
+    day_start = now - timedelta(hours=24)
+    posts_today = (
+        db.query(func.count(PostIdea.id))
+        .filter(
+            PostIdea.target_subreddit == subreddit,
+            PostIdea.posted_at > day_start,
+        )
+        .scalar()
+    ) or 0
+    if posts_today >= DAILY_POST_LIMIT:
+        return False, f"Daily limit reached: {posts_today}/{DAILY_POST_LIMIT} posts to r/{subreddit} today."
+
+    return True, ""
 
 
 # ─── Test creation ─────────────────────────────────────────────────────────────
@@ -83,10 +128,16 @@ def post_variant_to_reddit(
         logger.error(f"[A/B] PostIdea #{variant.post_idea_id} not found.")
         return False
 
+    # Spam prevention: check cooldown and daily limit
+    subreddit_name = str(post_idea.target_subreddit) if post_idea.target_subreddit is not None else ""
+    allowed, reason = _check_posting_allowed(db, subreddit_name)
+    if not allowed:
+        logger.warning(f"[A/B] Posting blocked: {reason}")
+        return False
+
     try:
         reddit = _get_reddit_client()
         # ensure plain strings are passed to PRAW
-        subreddit_name = str(post_idea.target_subreddit) if post_idea.target_subreddit is not None else ""
         subreddit = reddit.subreddit(subreddit_name)
 
         post_type: str = str(post_idea.post_type) if post_idea.post_type is not None else ""
@@ -119,9 +170,15 @@ def post_idea_to_reddit(db: Session, post_idea: PostIdea) -> bool:
     """
     Post a directly-approved PostIdea (not A/B tested) to Reddit.
     """
+    # Spam prevention: check cooldown and daily limit
+    subreddit_name = str(post_idea.target_subreddit) if post_idea.target_subreddit is not None else ""
+    allowed, reason = _check_posting_allowed(db, subreddit_name)
+    if not allowed:
+        logger.warning(f"[Post] Posting blocked: {reason}")
+        return False
+
     try:
         reddit = _get_reddit_client()
-        subreddit_name = str(post_idea.target_subreddit) if post_idea.target_subreddit is not None else ""
         subreddit = reddit.subreddit(subreddit_name)
 
         post_type: str = str(post_idea.post_type) if post_idea.post_type is not None else ""
