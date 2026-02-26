@@ -141,6 +141,75 @@ def _matches_armenian_keywords(text: str) -> bool:
     return bool(_ARMENIAN_PATTERN.search(text))
 
 
+# ---------------------------------------------------------------------------
+# Blocked & duplicate source filters for Google News aggregator
+# ---------------------------------------------------------------------------
+
+# State-sponsored / propaganda outlets — Russia, Azerbaijan, Turkey, Georgia
+BLOCKED_SOURCES: set[str] = {
+    # Russia
+    "rt", "russia today", "rt.com", "sputnik", "sputniknews",
+    "tass", "ria novosti", "ria news", "interfax",
+    "rossiyskaya gazeta", "izvestia", "kommersant",
+    # Azerbaijan
+    "azernews", "azertag", "apa.az", "report.az", "caliber.az",
+    "trend.az", "news.az", "latest news from azerbaijan",
+    "baku research institute", "caspian news",
+    "day.az", "axar.az", "haqqin.az",
+    # Turkey
+    "trt", "trt world", "trt haber", "anadolu agency",
+    "daily sabah", "türkiye today", "turkiye today",
+    "yeni safak", "yeni şafak", "turkish minute",
+    # Georgia (state-sponsored)
+    "georgia today", "1tv.ge", "georgian journal",
+    "agenda.ge",
+}
+
+# Sources we already scrape directly — skip duplicates from Google News
+DUPLICATE_SOURCES: set[str] = {
+    "armenpress", "asbarez", "the armenian weekly", "armenian weekly",
+    "azatutyun", "radio free europe", "rfe/rl",
+    "hetq", "hetq.am", "panorama.am",
+    "evn report", "oc media", "civilnet",
+    "massis post", "the armenian mirror-spectator", "armenian mirror-spectator",
+    "mirror-spectator", "mirrorspectator",
+    "horizon weekly", "agos",
+    "euronews", "euronews.com",
+    "france 24", "al jazeera", "al-monitor",
+    "bbc", "bbc world", "bbc news",
+    "deutsche welle", "dw",
+}
+
+_BLOCKED_PATTERN: re.Pattern[str] = re.compile(
+    r"(?:" + "|".join(re.escape(s) for s in BLOCKED_SOURCES) + r")\s*$",
+    re.IGNORECASE,
+)
+
+_DUPLICATE_PATTERN: re.Pattern[str] = re.compile(
+    r"(?:" + "|".join(re.escape(s) for s in DUPLICATE_SOURCES) + r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def _is_blocked_source(title: str) -> bool:
+    """Check if a Google News title ends with a blocked source name."""
+    # Google News titles look like: "Headline text - Source Name"
+    parts = title.rsplit(" - ", 1)
+    if len(parts) < 2:
+        return False
+    source = parts[-1].strip()
+    return bool(_BLOCKED_PATTERN.search(source))
+
+
+def _is_duplicate_source(title: str) -> bool:
+    """Check if a Google News title ends with a source we already scrape."""
+    parts = title.rsplit(" - ", 1)
+    if len(parts) < 2:
+        return False
+    source = parts[-1].strip()
+    return bool(_DUPLICATE_PATTERN.search(source))
+
+
 class KeywordFilteredRSSScraper(RSSNewsScraper):
     """
     RSS scraper that **only** keeps articles matching Armenian-related
@@ -301,8 +370,14 @@ class GoogleNewsArmenianScraper(RSSNewsScraper):
     Google News pre-filtered RSS for 'Armenia OR Armenian'.
     Already keyword-filtered by Google, so uses plain RSSNewsScraper.
     Aggregates coverage from NYT, Jerusalem Post, Reuters, CFR, etc.
+
+    Applies two extra filters:
+    - **Blocked**: removes state-sponsored media from Russia, Azerbaijan,
+      Turkey, and Georgia.
+    - **Dedup**: removes articles from sources we already scrape directly
+      (Armenian Weekly, Hetq, Euronews, etc.).
     """
-    SOURCE_NAME = "Google News – Armenia"
+    SOURCE_NAME = "Google News - Armenia"
     BASE_URL = "https://news.google.com"
     RSS_URL = (
         "https://news.google.com/rss/search?"
@@ -311,6 +386,25 @@ class GoogleNewsArmenianScraper(RSSNewsScraper):
 
     def __init__(self):
         super().__init__(self.SOURCE_NAME, self.BASE_URL, self.RSS_URL, "international")
+
+    def scrape(self) -> list[ScrapedArticle]:
+        all_articles = super().scrape()
+        clean: list[ScrapedArticle] = []
+        blocked_count = 0
+        dup_count = 0
+        for a in all_articles:
+            if _is_blocked_source(a.title):
+                blocked_count += 1
+                continue
+            if _is_duplicate_source(a.title):
+                dup_count += 1
+                continue
+            clean.append(a)
+        logger.info(
+            f"[{self.name}] Source filter: kept {len(clean)}/{len(all_articles)} "
+            f"(blocked={blocked_count}, duplicate={dup_count})."
+        )
+        return clean
 
 
 class AlJazeeraScraper(KeywordFilteredRSSScraper):
