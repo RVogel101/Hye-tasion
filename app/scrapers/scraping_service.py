@@ -55,8 +55,8 @@ def _persist_articles(db: Session, source: Source, articles: list[ScrapedArticle
         db.add(db_article)
         new_count += 1
 
-    source.last_scraped_at = datetime.now(UTC)
-    source.article_count = (source.article_count or 0) + new_count
+    source.last_scraped_at = datetime.now(UTC)  # type: ignore[assignment]
+    source.article_count = (source.article_count or 0) + new_count  # type: ignore[assignment]
     db.commit()
     return new_count
 
