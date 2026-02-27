@@ -74,7 +74,7 @@ async function loadDashboard() {
 
 async function loadRecommendations() {
   try {
-    const r = await api("/reddit/recommendations?subreddit=armenia");
+    const r = await api("/reddit/recommendations?subreddit=ArmeniansGlobal");
     const el = document.getElementById("recommendations-list");
     if (r.recommendations && r.recommendations.length) {
       el.innerHTML = r.recommendations.map((rec) => `
