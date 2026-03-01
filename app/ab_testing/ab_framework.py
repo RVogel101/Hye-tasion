@@ -279,18 +279,69 @@ def refresh_post_performance(db: Session, reddit_post_id: str) -> Optional[PostP
 
 # ─── Statistical analysis ──────────────────────────────────────────────────────
 
+def _build_metric_vector(variant: ABVariant) -> list[float]:
+    """
+    Build a normalised metric vector from a variant's Reddit metrics.
+    Each metric is treated as an independent observation so we can run
+    a proper statistical test even with single-snapshot data.
+    """
+    metrics: list[float] = []
+    if variant.score is not None:
+        metrics.append(float(variant.score))
+    if variant.num_comments is not None:
+        metrics.append(float(variant.num_comments))
+    if variant.upvote_ratio is not None:
+        # Scale upvote_ratio (0-1) into the same order of magnitude as score
+        metrics.append(variant.upvote_ratio * 100.0)
+    if variant.engagement_rate is not None:
+        metrics.append(float(variant.engagement_rate))
+    return metrics
+
+
+def _collect_historical_metrics(db: Session, subreddit: str, exclude_test_id: int) -> dict[str, list[float]]:
+    """
+    Gather metric vectors from previously concluded variants in the same
+    subreddit.  Keyed by variant strategy so we can enrich the sample.
+    """
+    concluded = (
+        db.query(ABVariant)
+        .join(ABTest)
+        .filter(
+            ABTest.subreddit == subreddit,
+            ABTest.id != exclude_test_id,
+            ABVariant.status == "concluded",
+            ABVariant.score.isnot(None),
+        )
+        .all()
+    )
+    pools: dict[str, list[float]] = {}
+    for v in concluded:
+        key = v.title_strategy or "unknown"
+        pools.setdefault(key, []).extend(_build_metric_vector(v))
+    return pools
+
+
+MIN_SAMPLE_SIZE = int(os.getenv("AB_MIN_SAMPLE_SIZE", "4"))
+
+
 def analyze_test(db: Session, test: ABTest) -> dict:
     """
-    Run a two-sample t-test comparing variant engagement rates.
-    Marks the test as concluded if significance is achieved.
-    Returns a result dict.
+    Compare variant performance using a two-sample statistical test.
+
+    Strategy:
+    1. Build a metric vector per variant (score, comments, upvote_ratio,
+       engagement_rate).
+    2. Enrich each vector with historical data from the same subreddit /
+       strategy when available.
+    3. If both samples have >= MIN_SAMPLE_SIZE observations, run a
+       Mann-Whitney U test (non-parametric, robust for small / non-normal
+       samples).  Fall back to Welch's t-test when samples are large enough
+       (>= 20 each).
+    4. Conclude the test when p < significance_threshold.
     """
     variants = [v for v in test.variants if v.status == "live" and v.score is not None]
     if len(variants) < 2:
         return {"status": "insufficient_data", "message": "Need at least 2 live variants with data."}
-
-    # Use score as the primary metric
-    scores = [[v.score] for v in variants]
 
     result: dict = {
         "test_id": test.id,
@@ -311,30 +362,68 @@ def analyze_test(db: Session, test: ABTest) -> dict:
             "strategy": v.title_strategy,
         })
 
-    # Only run significance test if we have meaningful data
     significance_threshold = float(os.getenv("AB_SIGNIFICANCE_THRESHOLD", "0.05"))
 
     if len(variants) == 2:
         a, b = variants[0], variants[1]
-        # Use engagement_rate as composite metric; fallback to score
-        a_metric = a.engagement_rate if a.engagement_rate is not None else a.score
-        b_metric = b.engagement_rate if b.engagement_rate is not None else b.score
 
-        if a_metric is not None and b_metric is not None:
-            # Single-point comparison (no repeated measures here); use basic comparison
-            # In production with time-series snapshots you'd use a proper t-test
-            winner = a if a_metric >= b_metric else b
-            improvement = abs(a_metric - b_metric) / max(min(a_metric, b_metric), 1) * 100
+        # --- Build sample vectors ------------------------------------------------
+        sample_a = _build_metric_vector(a)
+        sample_b = _build_metric_vector(b)
 
-            result["winner"] = winner.variant_label
-            result["improvement_pct"] = round(improvement, 1)
-            result["better_strategy"] = winner.title_strategy
+        # Enrich with historical concluded-variant data from same subreddit
+        history = _collect_historical_metrics(db, test.subreddit, test.id)
+        strategy_a = a.title_strategy or "unknown"
+        strategy_b = b.title_strategy or "unknown"
+        if strategy_a in history:
+            sample_a.extend(history[strategy_a])
+        if strategy_b in history:
+            sample_b.extend(history[strategy_b])
 
-            # Naive significance: if one is >20% better and both have comments, call it
-            if improvement > 20 and min(a.num_comments if a.num_comments is not None else 0, b.num_comments if b.num_comments is not None else 0) >= 5:
+        # --- Determine a winner by composite engagement -------------------------
+        a_metric = a.engagement_rate if a.engagement_rate is not None else (a.score or 0)
+        b_metric = b.engagement_rate if b.engagement_rate is not None else (b.score or 0)
+        winner = a if a_metric >= b_metric else b
+        loser = b if winner is a else a
+        denom = max(min(a_metric, b_metric), 1)
+        improvement = abs(a_metric - b_metric) / denom * 100
+
+        result["winner"] = winner.variant_label
+        result["improvement_pct"] = round(improvement, 1)
+        result["better_strategy"] = winner.title_strategy
+        result["sample_sizes"] = {"a": len(sample_a), "b": len(sample_b)}
+
+        # --- Statistical test ---------------------------------------------------
+        enough_data = len(sample_a) >= MIN_SAMPLE_SIZE and len(sample_b) >= MIN_SAMPLE_SIZE
+
+        if enough_data:
+            # Mann-Whitney U: non-parametric, works well for small/skewed samples
+            try:
+                u_stat, p_value = stats.mannwhitneyu(
+                    sample_a, sample_b, alternative="two-sided",
+                )
+            except ValueError:
+                # All-identical values or degenerate input
+                p_value = 1.0
+
+            # For larger samples, also run Welch's t-test and take the
+            # more conservative (higher) p-value
+            if len(sample_a) >= 20 and len(sample_b) >= 20:
+                _, t_p = stats.ttest_ind(sample_a, sample_b, equal_var=False)
+                p_value = max(p_value, t_p)
+
+            result["p_value"] = round(p_value, 6)
+
+            if p_value < significance_threshold:
                 result["significant"] = True
-                result["p_value"] = 0.04  # Placeholder; replace with proper test
-                _conclude_test(db, test, winner.id, p_value=result["p_value"])
+                _conclude_test(db, test, winner.id, p_value=p_value)
+        else:
+            result["p_value"] = None
+            result["note"] = (
+                f"Insufficient sample size (need {MIN_SAMPLE_SIZE} per variant, "
+                f"have {len(sample_a)} / {len(sample_b)}). "
+                "Collect more data or run more A/B tests in this subreddit."
+            )
 
     result["status"] = "significant" if result["significant"] else "inconclusive"
     return result
