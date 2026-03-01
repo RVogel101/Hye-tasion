@@ -69,10 +69,14 @@ class PostPerformance(Base):
     reddit_post_id = Column(String(20), nullable=False, unique=True)
     subreddit = Column(String(100), nullable=False)
 
-    # Snapshot history stored as JSON in text fields
+    # Snapshot history — finer-grained time buckets
     score_at_1h = Column(Integer, nullable=True)
+    score_at_2h = Column(Integer, nullable=True)
+    score_at_4h = Column(Integer, nullable=True)
     score_at_6h = Column(Integer, nullable=True)
+    score_at_12h = Column(Integer, nullable=True)
     score_at_24h = Column(Integer, nullable=True)
+    score_at_48h = Column(Integer, nullable=True)
     score_at_7d = Column(Integer, nullable=True)
     final_score = Column(Integer, nullable=True)
     final_comments = Column(Integer, nullable=True)
