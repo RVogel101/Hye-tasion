@@ -19,9 +19,9 @@ def simple_sentiment(text: str) -> float:
     the entire collector module.
     """
     try:
-        import nltk
-        from nltk.sentiment.vader import SentimentIntensityAnalyzer
-    except Exception:  # nltk not installed / resources missing
+        import nltk  # type: ignore[reportMissingModuleSource]
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer  # type: ignore[reportMissingModuleSource]
+    except Exception:  # nltk not installed / resources missing 
         logger.debug("NLTK unavailable, using canned sentiment vocabulary")
         pos_words = {"great", "amazing", "historic", "important", "significant",
                      "victory", "peace", "freedom", "proud", "heritage"}

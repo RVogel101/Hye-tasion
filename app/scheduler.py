@@ -6,7 +6,7 @@ import logging
 import os
 
 import yaml
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore[reportMissingModuleSource]
 
 from app.database import SessionLocal
 from app.scrapers.scraping_service import run_all_scrapes

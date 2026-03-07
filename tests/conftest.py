@@ -13,8 +13,8 @@ os.environ["REDDIT_CLIENT_SECRET"] = "fake"
 os.environ["REDDIT_USERNAME"] = "fake"
 os.environ["REDDIT_PASSWORD"] = "fake"
 
-from sqlalchemy import create_engine, StaticPool
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, StaticPool  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import sessionmaker  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.database import Base, get_db
 from app import app as fastapi_app
@@ -38,7 +38,7 @@ def engine():
 
 @pytest.fixture()
 def db(engine):
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine)  # type: ignore[reportInvalidType]
     session = Session()
     try:
         yield session
@@ -49,7 +49,7 @@ def db(engine):
 @pytest.fixture()
 def client(engine, db):
     """FastAPI TestClient wired to use the test database session."""
-    from fastapi.testclient import TestClient
+    from fastapi.testclient import TestClient  # type: ignore[reportMissingModuleSource]
 
     def _override_get_db():
         try:
@@ -69,7 +69,7 @@ def client(engine, db):
 
 @pytest.fixture()
 def make_source(db):
-    from app.models.source import Source
+    from app.models.source import Source  # type: ignore[reportMissingModuleSource]
 
     def _make(name="Test Source", url="https://example.com", category="news", **kw):
         s = Source(name=name, url=url, category=category, **kw)
@@ -82,7 +82,7 @@ def make_source(db):
 
 @pytest.fixture()
 def make_article(db, make_source):
-    from app.models.source import Article
+    from app.models.source import Article  # type: ignore[reportMissingModuleSource]
 
     _counter = [0]
 
@@ -106,7 +106,7 @@ def make_article(db, make_source):
 
 @pytest.fixture()
 def make_post_idea(db, make_article):
-    from app.models.post import PostIdea
+    from app.models.post import PostIdea  # type: ignore[reportMissingModuleSource]
 
     _counter = [0]
 
@@ -130,7 +130,7 @@ def make_post_idea(db, make_article):
 
 @pytest.fixture()
 def make_ab_test(db, make_post_idea):
-    from app.models.ab_test import ABTest, ABVariant
+    from app.models.ab_test import ABTest, ABVariant  # type: ignore[reportMissingModuleSource] 
 
     def _make(subreddit="armenia", num_variants=2, variant_kw=None, **kw):
         idea = make_post_idea(subreddit=subreddit)

@@ -1,9 +1,9 @@
 """
 SQLAlchemy models for A/B testing framework.
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime, UTC
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import relationship  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from datetime import datetime, timezone
 
 from app.database import Base
 
@@ -17,7 +17,7 @@ class ABTest(Base):
     description = Column(Text, nullable=True)
     subreddit = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     concluded_at = Column(DateTime, nullable=True)
     winner_variant_id = Column(Integer, nullable=True)
 
@@ -84,7 +84,7 @@ class PostPerformance(Base):
 
     first_checked_at = Column(DateTime, nullable=True)
     last_checked_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     post_idea = relationship("PostIdea", back_populates="performance")
 

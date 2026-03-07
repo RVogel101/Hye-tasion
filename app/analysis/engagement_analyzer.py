@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import pandas as pd
 import numpy as np
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingModule]
 
 from app.models.reddit_data import RedditPost, EngagementPattern
 
@@ -82,8 +82,8 @@ def analyze_engagement_patterns(db: Session, subreddit: Optional[str] = None) ->
         }
 
         # ── Title structure ────────────────────────────────────────────────
-        high["structure"] = high["title"].apply(_title_structure)
-        structure_counts = high["structure"].value_counts().to_dict()
+        high["structure"] = high["title"].apply(_title_structure)  # type: ignore[attr-defined]
+        structure_counts = high["structure"].value_counts().to_dict()  # type: ignore[attr-defined]
         sub_results["patterns"]["title_structure"] = structure_counts
         _upsert_pattern(db, sub, "title_structure", structure_counts, high, threshold)
 
@@ -92,20 +92,20 @@ def analyze_engagement_patterns(db: Session, subreddit: Optional[str] = None) ->
             high["title_word_count"],
             bins=[0, 5, 10, 15, 20, 100],
             labels=["1-5w", "6-10w", "11-15w", "16-20w", "20+w"]
-        ).astype(str)
-        length_scores = high.groupby("len_bucket")["score"].mean().to_dict()
+        ).astype(str)  # type: ignore[attr-defined]
+        length_scores = high.groupby("len_bucket")["score"].mean().to_dict()  # type: ignore[attr-defined]
         sub_results["patterns"]["optimal_title_length"] = length_scores
         for bucket, avg_score in length_scores.items():
             _upsert_single_pattern(db, sub, "title_length_bucket", bucket, avg_score, len(high))
 
         # ── Question vs statement ──────────────────────────────────────────
-        q_score = float(high[high["has_question"]]["score"].mean()) if high["has_question"].any() else 0
-        s_score = float(high[~high["has_question"]]["score"].mean()) if (~high["has_question"]).any() else 0
+        q_score = float(high[high["has_question"]]["score"].mean()) if high["has_question"].any() else 0  # type: ignore[attr-defined]
+        s_score = float(high[~high["has_question"]]["score"].mean()) if (~high["has_question"]).any() else 0  # type: ignore[attr-defined]
         sub_results["patterns"]["question_avg_score"] = q_score
         sub_results["patterns"]["statement_avg_score"] = s_score
 
         # ── Post type ─────────────────────────────────────────────────────
-        type_scores = high.groupby("post_type")["score"].mean().to_dict()
+        type_scores = high.groupby("post_type")["score"].mean().to_dict()  # type: ignore[attr-defined]
         sub_results["patterns"]["post_type_scores"] = type_scores
         for pt, avg_score in type_scores.items():
             _upsert_single_pattern(db, sub, "post_type", pt, avg_score, len(high))
@@ -125,11 +125,11 @@ def analyze_engagement_patterns(db: Session, subreddit: Optional[str] = None) ->
             _upsert_single_pattern(db, sub, "keyword", word, count, len(high))
 
         # ── Posting hour (UTC) ────────────────────────────────────────────
-        if "created_utc" in high.columns and high["created_utc"].notna().any():
+        if "created_utc" in high.columns and high["created_utc"].notna().any():  # type: ignore[attr-defined]
             high = high.copy()
-            high["hour"] = pd.to_datetime(high["created_utc"]).dt.hour
-            hour_scores = high.groupby("hour")["score"].mean().to_dict()
-            best_hours = sorted(hour_scores, key=hour_scores.get, reverse=True)[:5]
+            high["hour"] = pd.to_datetime(high["created_utc"]).dt.hour  # type: ignore[attr-defined]
+            hour_scores = high.groupby("hour")["score"].mean().to_dict()  # type: ignore[attr-defined]
+            best_hours = sorted(hour_scores, key=hour_scores.get, reverse=True)[:5]  # type: ignore[arg-type]
             sub_results["patterns"]["best_posting_hours_utc"] = best_hours
             for h in best_hours:
                 _upsert_single_pattern(db, sub, "posting_hour_utc", str(h), hour_scores[h], len(high))
@@ -148,14 +148,14 @@ def _upsert_pattern(db: Session, subreddit: str, ptype: str, counts: dict, high_
 
 
 def _upsert_single_pattern(db: Session, subreddit: str, ptype: str, value: str, avg_score: float, count: int):
-    from datetime import datetime, UTC as _UTC
+    from datetime import datetime, timezone
     existing = db.query(EngagementPattern).filter_by(
         subreddit=subreddit, pattern_type=ptype, pattern_value=str(value)
     ).first()
     if existing:
         existing.avg_score = avg_score  # type: ignore[assignment]
         existing.sample_count = count  # type: ignore[assignment]
-        existing.last_updated = datetime.now(_UTC)  # type: ignore[assignment]
+        existing.last_updated = datetime.now(timezone.utc)  # type: ignore[assignment]
     else:
         db.add(EngagementPattern(
             subreddit=subreddit,

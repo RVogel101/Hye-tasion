@@ -1,9 +1,9 @@
 """
 SQLAlchemy models for scraped content sources and articles.
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, Enum, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime, UTC
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, Enum, ForeignKey  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import relationship  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from datetime import datetime, timezone
 import enum
 
 from app.database import Base
@@ -36,7 +36,7 @@ class Source(Base):
     is_active = Column(Boolean, default=True)
     last_scraped_at = Column(DateTime, nullable=True)
     article_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     articles = relationship("Article", back_populates="source")
 
@@ -54,7 +54,7 @@ class Article(Base):
     content = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
     published_at = Column(DateTime, nullable=True)
-    scraped_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    scraped_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     category = Column(String(50), nullable=True)
     tags = Column(Text, nullable=True)  # JSON list of tags
     is_processed = Column(Boolean, default=False)  # Has been used for post generation

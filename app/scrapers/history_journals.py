@@ -3,7 +3,7 @@ Scrapers for history journals, academic sources, and Wikipedia history pages.
 """
 import logging
 import re
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.scrapers.base_scraper import BaseScraper, ScrapedArticle
@@ -86,7 +86,7 @@ class WikipediaArmenianHistoryScraper(BaseScraper):
             url=url,
             content=content[:5000],
             summary=summary[:800],
-            published_at=datetime.now(UTC),
+            published_at=datetime.now(timezone.utc),
             category="history",
             tags=["history", "armenia", "wikipedia"],
         )
@@ -125,7 +125,7 @@ class HyestartScraper(BaseScraper):
                     title=text,
                     url=url,
                     summary="",
-                    published_at=datetime.now(UTC),
+                    published_at=datetime.now(timezone.utc),
                     category="history",
                     tags=["history", "armenia", "culture"],
                 )
@@ -190,7 +190,7 @@ class ArmenianStudiesAcademicScraper(BaseScraper):
                         url=page_url,
                         content=content[:3000],
                         summary=content[:300],
-                        published_at=datetime.now(UTC),
+                        published_at=datetime.now(timezone.utc),
                         category=category,
                         tags=["academia", "armenia"],
                     )
@@ -212,7 +212,7 @@ class ArmenianHistoryOnThisDay(BaseScraper):
         super().__init__(self.SOURCE_NAME, self.BASE_URL)
 
     def scrape(self) -> list[ScrapedArticle]:
-        today = datetime.now(UTC)
+        today = datetime.now(timezone.utc)
         month_name = today.strftime("%B")
         day = today.day
         url = f"https://en.wikipedia.org/wiki/{month_name}_{day}"

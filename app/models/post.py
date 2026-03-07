@@ -1,9 +1,9 @@
 """
 SQLAlchemy models for generated post ideas and their approval workflow.
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime, UTC
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import relationship  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from datetime import datetime, timezone
 import enum
 
 from app.database import Base
@@ -28,7 +28,7 @@ class PostIdea(Base):
     target_subreddit = Column(String(100), nullable=False)
     source_url = Column(String(1000), nullable=True)
     status = Column(String(20), default=PostStatus.pending)
-    generated_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     reviewed_at = Column(DateTime, nullable=True)
     posted_at = Column(DateTime, nullable=True)
     reddit_post_id = Column(String(20), nullable=True)  # The actual Reddit post ID after posting

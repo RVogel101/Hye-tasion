@@ -7,10 +7,10 @@ import logging
 import os
 import re
 import random
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.models.source import Article
 from app.models.post import PostIdea

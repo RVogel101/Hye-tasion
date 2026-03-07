@@ -6,13 +6,13 @@ tracking their performance, and running statistical significance tests.
 import logging
 import os
 import time
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import praw
-from scipy import stats
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+import praw  # type: ignore[reportMissingModuleSource]
+from scipy import stats  # type: ignore[reportMissingModuleSource]
+from sqlalchemy import func  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.models.ab_test import ABTest, ABVariant, PostPerformance
 from app.models.post import PostIdea, PostStatus
@@ -40,7 +40,7 @@ def _check_posting_allowed(db: Session, subreddit: str) -> tuple[bool, str]:
     Enforce posting cooldown and daily limit per subreddit.
     Returns (allowed, reason) — required by Reddit Developer Terms (no spam).
     """
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
 
     # Check cooldown: most recent post to this subreddit
     last_post = (
@@ -155,7 +155,7 @@ def post_variant_to_reddit(
             )
 
         variant.reddit_post_id = submission.id  # type: ignore[assignment]
-        variant.posted_at = datetime.now(UTC)  # type: ignore[assignment]
+        variant.posted_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         variant.status = "live"  # type: ignore[assignment]
         db.commit()
         logger.info(f"[A/B] Posted variant {variant.variant_label} → reddit ID {submission.id}")
@@ -196,7 +196,7 @@ def post_idea_to_reddit(db: Session, post_idea: PostIdea) -> bool:
             )
 
         post_idea.reddit_post_id = submission.id  # type: ignore[assignment]
-        post_idea.posted_at = datetime.now(UTC)  # type: ignore[assignment]
+        post_idea.posted_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         post_idea.status = PostStatus.posted  # type: ignore[assignment]
 
         # Create performance tracking row
@@ -204,7 +204,7 @@ def post_idea_to_reddit(db: Session, post_idea: PostIdea) -> bool:
             post_idea_id=post_idea.id,
             reddit_post_id=submission.id,
             subreddit=post_idea.target_subreddit,
-            first_checked_at=datetime.now(UTC),
+            first_checked_at=datetime.now(timezone.utc),
         )
         db.add(perf)
         db.commit()
@@ -236,7 +236,7 @@ def refresh_variant_metrics(db: Session, test: ABTest) -> None:
             variant.upvote_ratio = submission.upvote_ratio
             variant.num_comments = submission.num_comments
             variant.engagement_rate = submission.score * submission.upvote_ratio
-            variant.last_metrics_update = datetime.now(UTC)
+            variant.last_metrics_update = datetime.now(timezone.utc)
             logger.info(
                 f"[A/B] Variant {variant.variant_label} metrics: "
                 f"score={submission.score}, comments={submission.num_comments}"
@@ -254,7 +254,7 @@ def refresh_post_performance(db: Session, reddit_post_id: str) -> Optional[PostP
     try:
         reddit = _get_reddit_client()
         submission = reddit.submission(id=reddit_post_id)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
         if perf.first_checked_at is not None:
             elapsed_hours = (now - perf.first_checked_at).total_seconds() / 3600
@@ -446,7 +446,7 @@ def analyze_test(db: Session, test: ABTest) -> dict:
 
 def _conclude_test(db: Session, test: ABTest, winner_variant_id: int, p_value: float) -> None:
     test.is_active = False  # type: ignore[assignment]
-    test.concluded_at = datetime.now(UTC)  # type: ignore[assignment]
+    test.concluded_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     test.winner_variant_id = winner_variant_id  # type: ignore[assignment]
     test.significance_achieved = True  # type: ignore[assignment]
     test.p_value = p_value  # type: ignore[assignment]

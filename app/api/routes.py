@@ -4,13 +4,13 @@ A/B test management, Reddit data collection, and engagement analysis.
 """
 import logging
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingModule]
 from app.database import get_db
 from app.models.source import Article, Source
 from app.models.post import PostIdea, PostStatus

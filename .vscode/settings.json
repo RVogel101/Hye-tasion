@@ -8,5 +8,12 @@
             "database": "${workspaceFolder:Hye-tasion}/hye_tasion.db",
             "name": "hye_tasion"
         }
+    ],
+    "python-envs.pythonProjects": [
+        {
+            "path": "",
+            "envManager": "ms-python.python:conda",
+            "packageManager": "ms-python.python:conda"
+        }
     ]
 }

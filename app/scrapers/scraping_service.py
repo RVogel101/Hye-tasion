@@ -5,9 +5,9 @@ and persists articles to the database.
 import json
 import logging
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.scrapers.utils import (
     run_scrape_set,

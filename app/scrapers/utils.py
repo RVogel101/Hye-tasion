@@ -17,15 +17,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.models.source import Source, Article
 from app.scrapers.base_scraper import ScrapedArticle
 
 # import normalization helpers from the core package; the dependency is added
-to requirements.txt so pip installs a local editable copy
+# to requirements.txt so pip installs a local editable copy
 try:
-    from armenian_corpus_core.core_contracts import normalize_text_for_hash
+    from armenian_corpus_core.core_contracts import normalize_text_for_hash  # type: ignore[reportMissingModuleSource]
 except ImportError:  # pragma: no cover - optional during early development
     def normalize_text_for_hash(text: str) -> str:  # type: ignore
         # fall back to a noop if core isn't available
@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover - optional during early development
 # optional corpus-core integration (centralized news database)
 # ---------------------------------------------------------------------------
 try:
-    from armenian_corpus_core.data_sources import get_news_documents, get_news_sources
+    from armenian_corpus_core.data_sources import get_news_documents, get_news_sources  # type: ignore[reportMissingModuleSource]
 except Exception:  # import error or NotImplementedError
     def get_news_documents():  # type: ignore
         raise NotImplementedError("No core news document source configured")
@@ -61,7 +61,7 @@ def load_articles_from_core() -> dict[str, list[ScrapedArticle]]:
     except NotImplementedError:
         return mapping
 
-    for rec in docs:
+    for rec in docs:  # type: ignore[reportInvalidIterableAssignment]
         sf = getattr(rec, "source_family", "core") or "core"
         art = ScrapedArticle(
             title=rec.title or "",

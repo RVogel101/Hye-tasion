@@ -5,11 +5,11 @@ extracts engagement features, and stores them for pattern analysis.
 import logging
 import os
 import re
-from datetime import datetime, UTC, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-import praw
-from sqlalchemy.orm import Session
+import praw  # type: ignore[reportMissingModuleSource]
+from sqlalchemy.orm import Session  # type: ignore[reportMissingModuleSource, reportMissingImports]
 
 from app.models.reddit_data import RedditPost, EngagementPattern
 
@@ -90,7 +90,7 @@ def collect_reddit_data(
                     post_type=features["post_type"],
                     flair=submission.link_flair_text,
                     is_nsfw=submission.over_18,
-                    created_utc=datetime.fromtimestamp(submission.created_utc, tz=UTC),
+                    created_utc=datetime.fromtimestamp(submission.created_utc, tz=timezone.utc),
                     title_length=features["title_length"],
                     title_word_count=features["title_word_count"],
                     has_question=features["has_question"],
@@ -137,7 +137,7 @@ def cleanup_deleted_posts(db: Session) -> dict:
     """
     reddit = _get_reddit_client()
     retention_days = int(os.getenv("DATA_RETENTION_DAYS", "90"))
-    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     stats = {"deleted": 0, "expired": 0, "errors": 0}
 
     # 1. Purge posts older than retention period

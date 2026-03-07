@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-import feedparser
+import feedparser  # type: ignore[reportMissingModuleSource]
 
 from app.scrapers.base_scraper import BaseScraper, ScrapedArticle
 from app.scrapers.utils import parse_rss_date
@@ -55,11 +55,11 @@ class RSSNewsScraper(BaseScraper):
             summary = str(entry.get("summary", entry.get("description", "")))
             summary = self.clean_text(summary)
             # Strip HTML tags from summary
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup  # type: ignore[reportMissingModuleSource]
             summary = BeautifulSoup(summary, "lxml").get_text(separator=" ")
             summary = self.clean_text(summary)
 
-            published_at = _parse_rss_date(
+            published_at = parse_rss_date(
                 str(entry.get("published", entry.get("updated", "")) or "")
             )
 

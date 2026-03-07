@@ -46,10 +46,10 @@ def test_db_helpers(db, make_source):
         BASE_URL = "https://foo.example"
 
     src1 = scraper_utils.get_or_create_source(db, DummyScraper)
-    assert src1.name == "Foo"
+    assert src1.name == "Foo"  # type: ignore[reportGeneralTypeIssues]
     # second call returns the same object
     src2 = scraper_utils.get_or_create_source(db, DummyScraper)
-    assert src1.id == src2.id
+    assert src1.id == src2.id  # type: ignore[reportGeneralTypeIssues]
 
     # persist_articles should add new rows and skip duplicates
     from app.scrapers.base_scraper import ScrapedArticle

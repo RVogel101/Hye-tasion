@@ -1,8 +1,8 @@
 """
 SQLAlchemy models for Reddit scraped data used in engagement analysis.
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean
-from datetime import datetime, UTC
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean  # type: ignore[reportMissingModuleSource, reportMissingImports]
+from datetime import datetime, timezone
 
 from app.database import Base
 
@@ -24,7 +24,7 @@ class RedditPost(Base):
     flair = Column(String(100), nullable=True)
     is_nsfw = Column(Boolean, default=False)
     created_utc = Column(DateTime, nullable=False)
-    scraped_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    scraped_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Computed/derived engagement features
     engagement_score = Column(Float, nullable=True)   # Composite score
@@ -48,7 +48,7 @@ class EngagementPattern(Base):
     pattern_value = Column(String(500), nullable=False)
     avg_score = Column(Float, default=0.0)
     sample_count = Column(Integer, default=0)
-    last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<EngagementPattern(subreddit={self.subreddit}, type={self.pattern_type})>"

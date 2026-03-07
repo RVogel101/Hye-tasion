@@ -4,14 +4,29 @@ that have empty or missing tags.
 """
 import json
 import logging
+import re
 import sys
 
 from app.database import SessionLocal
 from app.models.source import Article, Source
-from app.scrapers.armenian_news import _auto_generate_tags
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def _auto_generate_tags(title: str, summary: str, category: str) -> list[str]:
+    """Generate a simple list of tags from title, summary, and category."""
+    text = f"{title} {summary}".lower()
+    words = re.findall(r"[a-z\u0561-\u0587\u0531-\u0556\u0370-\u03ff]+", text)
+    tags = [w for w in words if len(w) >= 3][:15]
+    if category and category not in tags:
+        tags.append(category)
+    return list(dict.fromkeys(tags))  # preserve order, dedupe
+    words = re.findall(r"[a-z\u0561-\u0587\u0531-\u0556\u0370-\u03ff]+", text)
+    tags = [w for w in words if len(w) >= 3][:15]
+    if category and category not in tags:
+        tags.append(category)
+    return list(dict.fromkeys(tags))  # preserve order, dedupe
 
 
 def backfill_tags():
