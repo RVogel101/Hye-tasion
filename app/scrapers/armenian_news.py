@@ -10,100 +10,19 @@ International (keyword-filtered):
 import logging
 import re
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from typing import Optional
 
 import feedparser
 
 from app.scrapers.base_scraper import BaseScraper, ScrapedArticle
+from app.scrapers.utils import parse_rss_date
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_rss_date(date_str: str) -> Optional[datetime]:
-    """Parse an RFC-2822 / RSS date string into a timezone-aware datetime."""
-    if not date_str:
-        return None
-    try:
-        return parsedate_to_datetime(date_str)
-    except Exception:
-        return None
 
-
-# ---------------------------------------------------------------------------
-# Auto-tag generation for feeds that don't provide tags
-# ---------------------------------------------------------------------------
-
-_TAG_KEYWORDS: dict[str, list[str]] = {
-    "genocide": [r"\bgenocide\b", r"\b1915\b", r"\bmedz\s*yeghern\b"],
-    "politics": [r"\bpashinyan\b", r"\bparliament\b", r"\belection\b", r"\bgovernment\b",
-                 r"\bminister\b", r"\bdiplomat\b", r"\bforeign\s+affairs\b"],
-    "karabakh": [r"\bkarabakh\b", r"\bartsakh\b", r"\bnagorno\b",
-                 r"\bart[sz]akh?\b", r"\bart[sz]akhi\b", r"\bart[sz]akh\w*\b",
-                 r"\bstepanakert\b", r"\bkhankendi\b", r"\bberdzor\b",
-                 r"\blachin\b", r"\bshusha\b", r"\bshushi\b", r"\bhadrut\b"],
-    "diaspora": [r"\bdiaspora\b", r"\bcommunity\b.*armenian", r"\barmenian[- ]american\b",
-        r"\bspyurk\b", r"\bspiurk\b", r"\bgaghut\b",
-        r"\blebanon\s*hye\b", r"\blebanon\s*hay[ei]?\b",
-        r"\blebano[tz]+[iy]*e?s?\b", r"\blibanan\s*hay\b",
-        r"\bbourj\s*hammoud\b", r"\banjar\b.*armenian",
-        r"\bbeirut\b.*armenian", r"\barmenian\b.*beirut",
-        r"\bsouria\s*hay[ei]?\b", r"\bsurya\s*hye\b",
-        r"\bsyria\b.*armenian", r"\barmenian\b.*syria",
-        r"\baleppo\b.*armenian", r"\barmenian\b.*aleppo",
-        r"\bkessab\b", r"\bkasab\b",
-        r"\bparsk?a\s*hye\b", r"\bpars[kg]a\s*hay[ei]?\b",
-        r"\biran\b.*armenian", r"\barmenian\b.*iran",
-        r"\bnew\s*julfa\b", r"\bjulfa\b.*armenian",
-        r"\btehran\b.*armenian", r"\bisfahan\b.*armenian",
-        r"\bdetroit\s*[ts]i\b", r"\bdetroit\s*hay[ei]?\b",
-        r"\bdetroit\b.*armenian", r"\barmenian\b.*detroit",
-        r"\bdearborn\b.*armenian",
-        r"\bglendale\s*hye\b", r"\bglendale\s*hay[ei]?\b",
-        r"\bglendale\b.*armenian", r"\barmenian\b.*glendale",
-        r"\blos\s*angeles\b.*armenian", r"\barmenian\b.*los\s*angeles",
-        r"\bhollywood\b.*armenian", r"\blittle\s*armenia\b",
-        r"\bwatertown\b.*armenian", r"\barmenian\b.*watertown",
-        r"\bboston\b.*armenian",
-        r"\bfresno\b.*armenian", r"\barmenian\b.*fresno",
-        r"\bfrance\b.*armenian", r"\barmenian\b.*france",
-        r"\bmarseille\b.*armenian", r"\bparis\b.*armenian",
-        r"\bfrench[- ]armenian\b",
-        r"\bargentina\b.*armenian", r"\barmenian\b.*argentina",
-        r"\bbuenos\s*aires\b.*armenian",
-        r"\brussian[- ]armenian\b", r"\bmoscow\b.*armenian",
-        r"\bjavakh\w*\b", r"\bjavakheti\b", r"\bjavakhk\b",
-        r"\btbilisi\b.*armenian",
-        r"\bbolsa?hay[ei]?\b", r"\bpolis\s*hay[ei]?\b",
-        r"\bistanbul\b.*armenian",
-        r"\bcanad\w*[- ]armenian\b", r"\bmontreal\b.*armenian",
-        r"\btoronto\b.*armenian",
-        r"\bsydney\b.*armenian", r"\baustrali\w*[- ]armenian\b",
-    ],
-}
-
-_TAG_PATTERNS: dict[str, re.Pattern[str]] = {
-    tag: re.compile("|".join(patterns), re.IGNORECASE)
-    for tag, patterns in _TAG_KEYWORDS.items()
-}
-
-
-def _auto_generate_tags(title: str, summary: str, category: str) -> list[str]:
-    """
-    Generate tags from title + summary text when the RSS feed provides none.
-    Always includes 'armenia' and the source category.
-    """
-    tags: list[str] = ["armenia"]
-    if category and category not in tags:
-        tags.append(category)
-
-    combined_text = f"{title} {summary}"
-    for tag, pattern in _TAG_PATTERNS.items():
-        if pattern.search(combined_text):
-            tags.append(tag)
-
-    # Cap at 8 tags to keep things manageable
-    return tags[:8]
+# the RSS date parser and auto-tag logic have been moved to
+# ``app.scrapers.utils``; the import above provides ``parse_rss_date``.
 
 
 class RSSNewsScraper(BaseScraper):

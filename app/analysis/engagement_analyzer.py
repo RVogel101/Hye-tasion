@@ -46,24 +46,7 @@ def _posts_to_df(posts: list[RedditPost]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _title_structure(title: str) -> str:
-    """Classify a post title into a structural pattern."""
-    t = title.strip()
-    if t.endswith("?"):
-        return "question"
-    if re.match(r"^\d", t):
-        return "starts_with_number"
-    if re.search(r"\b(breaking|update|just in)\b", t, re.I):
-        return "breaking_news"
-    if re.search(r":\s", t):
-        return "topic_colon_detail"
-    if re.search(r"\b(why|how|what|who|when|where)\b", t, re.I):
-        return "wh_question"
-    if len(t.split()) <= 6:
-        return "short_punchy"
-    if len(t.split()) >= 20:
-        return "long_descriptive"
-    return "standard"
+from app.analysis.utils import title_structure as _title_structure
 
 
 def analyze_engagement_patterns(db: Session, subreddit: Optional[str] = None) -> dict[str, Any]:

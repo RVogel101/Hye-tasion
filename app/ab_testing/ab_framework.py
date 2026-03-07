@@ -299,14 +299,14 @@ def _build_metric_vector(variant: ABVariant) -> list[float]:
     """
     metrics: list[float] = []
     if variant.score is not None:
-        metrics.append(float(variant.score))
+        metrics.append(float(variant.score))  # type: ignore[arg-type]
     if variant.num_comments is not None:
-        metrics.append(float(variant.num_comments))
+        metrics.append(float(variant.num_comments))  # type: ignore[arg-type]
     if variant.upvote_ratio is not None:
         # Scale upvote_ratio (0-1) into the same order of magnitude as score
-        metrics.append(variant.upvote_ratio * 100.0)
+        metrics.append(float(variant.upvote_ratio) * 100.0)  # type: ignore[arg-type]
     if variant.engagement_rate is not None:
-        metrics.append(float(variant.engagement_rate))
+        metrics.append(float(variant.engagement_rate))  # type: ignore[arg-type]
     return metrics
 
 
@@ -328,7 +328,7 @@ def _collect_historical_metrics(db: Session, subreddit: str, exclude_test_id: in
     )
     pools: dict[str, list[float]] = {}
     for v in concluded:
-        key = v.title_strategy or "unknown"
+        key = str(v.title_strategy) if v.title_strategy is not None else "unknown"
         pools.setdefault(key, []).extend(_build_metric_vector(v))
     return pools
 
@@ -384,9 +384,11 @@ def analyze_test(db: Session, test: ABTest) -> dict:
         sample_b = _build_metric_vector(b)
 
         # Enrich with historical concluded-variant data from same subreddit
-        history = _collect_historical_metrics(db, test.subreddit, test.id)
-        strategy_a = a.title_strategy or "unknown"
-        strategy_b = b.title_strategy or "unknown"
+        history = _collect_historical_metrics(
+            db, str(test.subreddit), int(test.id),  # type: ignore[arg-type]
+        )
+        strategy_a = str(a.title_strategy) if a.title_strategy is not None else "unknown"
+        strategy_b = str(b.title_strategy) if b.title_strategy is not None else "unknown"
         if strategy_a in history:
             sample_a.extend(history[strategy_a])
         if strategy_b in history:
@@ -421,7 +423,8 @@ def analyze_test(db: Session, test: ABTest) -> dict:
             # For larger samples, also run Welch's t-test and take the
             # more conservative (higher) p-value
             if len(sample_a) >= 20 and len(sample_b) >= 20:
-                _, t_p = stats.ttest_ind(sample_a, sample_b, equal_var=False)
+                t_result = stats.ttest_ind(sample_a, sample_b, equal_var=False)
+                t_p = float(t_result.pvalue)  # type: ignore[union-attr]
                 p_value = max(p_value, t_p)
 
             result["p_value"] = round(p_value, 6)

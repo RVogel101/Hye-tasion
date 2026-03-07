@@ -4,99 +4,63 @@ and persists articles to the database.
 """
 import json
 import logging
+import os
 from datetime import datetime, UTC
 
 from sqlalchemy.orm import Session
 
-from app.models.source import Source, Article
+from app.scrapers.utils import (
+    run_scrape_set,
+    load_articles_from_core,
+    get_or_create_source,
+    persist_articles,
+)
 from app.scrapers.armenian_news import ALL_NEWS_SCRAPERS
 from app.scrapers.history_journals import ALL_HISTORY_SCRAPERS
-from app.scrapers.base_scraper import ScrapedArticle
 
+# ``Source``/``Article``/``ScrapedArticle`` used to be referenced here; the
+# helper module now imports them as needed, so we don't need them directly.
 logger = logging.getLogger(__name__)
+# helpers were moved to app/scrapers/utils.py; imports above replace them
 
-
-def _get_or_create_source(db: Session, scraper) -> Source:
-    """Fetch the DB Source row for a scraper, creating it if absent."""
-    source = db.query(Source).filter_by(name=scraper.SOURCE_NAME).first()
-    if not source:
-        source = Source(
-            name=scraper.SOURCE_NAME,
-            url=scraper.BASE_URL,
-            rss_url=getattr(scraper, "RSS_URL", None) or getattr(scraper, "rss_url", None),
-            source_type=getattr(scraper, "source_type", "rss"),
-            category=getattr(scraper, "category", "news"),
-        )
-        db.add(source)
-        db.commit()
-        db.refresh(source)
-    return source
-
-
-def _persist_articles(db: Session, source: Source, articles: list[ScrapedArticle]) -> int:
-    """Insert new articles (skip already-known URLs). Returns count of new inserts."""
-    new_count = 0
-    for art in articles:
-        if not art.url or not art.title:
-            continue
-        exists = db.query(Article).filter_by(url=art.url).first()
-        if exists:
-            continue
-        db_article = Article(
-            source_id=source.id,
-            title=art.title[:499],
-            url=art.url[:999],
-            content=art.content[:50000] if art.content else None,
-            summary=art.summary[:2000] if art.summary else None,
-            published_at=art.published_at,
-            category=art.category,
-            tags=json.dumps(art.tags),
-        )
-        db.add(db_article)
-        new_count += 1
-
-    source.last_scraped_at = datetime.now(UTC)  # type: ignore[assignment]
-    source.article_count = (source.article_count or 0) + new_count  # type: ignore[assignment]
-    db.commit()
-    return new_count
 
 
 def run_news_scrape(db: Session) -> dict:
-    """Run all Armenian news scrapers and persist results."""
-    results = {}
-    for ScraperClass in ALL_NEWS_SCRAPERS:
-        scraper = ScraperClass()
-        try:
-            source = _get_or_create_source(db, scraper)
-            articles = scraper.scrape()
-            new = _persist_articles(db, source, articles)
-            results[scraper.SOURCE_NAME] = {"fetched": len(articles), "new": new}
-            logger.info(f"News scrape [{scraper.SOURCE_NAME}]: fetched={len(articles)}, new={new}")
-        except Exception as exc:
-            logger.error(f"News scrape [{scraper.SOURCE_NAME}] failed: {exc}", exc_info=True)
-            results[scraper.SOURCE_NAME] = {"error": str(exc)}
-    return results
+    """Run all Armenian news scrapers and persist results.
+
+    If the ``USE_CORE_NEWS`` environment variable is set truthy, we bypass the
+    usual web scrapers and instead load pre‑aggregated articles from the
+    ``armenian_corpus_core`` package.  That package may itself source data from
+    a central database or export, giving hyebot an alternate ingestion path.
+    """
+    use_core = os.getenv("USE_CORE_NEWS", "").lower() in ("1", "true", "yes")
+    if use_core:
+        results: dict[str, dict] = {}
+        articles_by_source = load_articles_from_core()  # type: ignore[name-defined]
+        for src_name, articles in articles_by_source.items():
+            proxy = type("CoreSource", (), {"SOURCE_NAME": src_name, "BASE_URL": ""})
+            source = get_or_create_source(db, proxy)
+            new = persist_articles(db, source, articles)
+            results[src_name] = {"fetched": len(articles), "new": new}
+            logger.info(f"Core news load [{src_name}]: fetched={len(articles)}, new={new}")
+        return results
+    else:
+        return run_scrape_set(db, ALL_NEWS_SCRAPERS)
 
 
 def run_history_scrape(db: Session) -> dict:
     """Run all history/academic scrapers and persist results."""
-    results = {}
-    for ScraperClass in ALL_HISTORY_SCRAPERS:
-        scraper = ScraperClass()
-        try:
-            source = _get_or_create_source(db, scraper)
-            articles = scraper.scrape()
-            new = _persist_articles(db, source, articles)
-            results[scraper.SOURCE_NAME] = {"fetched": len(articles), "new": new}
-            logger.info(f"History scrape [{scraper.SOURCE_NAME}]: fetched={len(articles)}, new={new}")
-        except Exception as exc:
-            logger.error(f"History scrape [{scraper.SOURCE_NAME}] failed: {exc}", exc_info=True)
-            results[scraper.SOURCE_NAME] = {"error": str(exc)}
-    return results
+    return run_scrape_set(db, ALL_HISTORY_SCRAPERS)
 
+
+# ``run_all_scrapes`` is no longer needed, but keep it for backwards
+# compatibility with code/tests that may import it.
 
 def run_all_scrapes(db: Session) -> dict:
-    """Run both news and history scrapes in a single call."""
+    """Run both news and history scrapes in a single call.
+
+    Just a thin wrapper around the new helpers.
+    """
     return {
         "news": run_news_scrape(db),
         "history": run_history_scrape(db),

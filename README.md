@@ -37,6 +37,15 @@ Get Reddit API credentials at https://www.reddit.com/prefs/apps (create a "scrip
 python main.py
 ```
 
+> 🔁 **Alternate ingestion**
+>
+> Set `USE_CORE_NEWS=true` in your environment to bypass the built‑in web
+> scrapers; the app will instead call
+> ``armenian_corpus_core.data_sources.get_news_documents()`` and load any
+> articles provided there.  This lets Hyebot consume a centralised database
+> of news content maintained by the corpus‑core project.
+
+
 Open **http://127.0.0.1:8000** in your browser.
 
 ## Dashboard
@@ -57,7 +66,7 @@ The web interface provides:
 |--------|----------|-------------|
 | GET | `/api/stats` | Dashboard statistics |
 | POST | `/api/scrape/all` | Trigger full scrape |
-| POST | `/api/scrape/news` | Scrape news sources only |
+| POST | `/api/scrape/news` | Scrape news sources only (see **USE_CORE_NEWS** below) |
 | POST | `/api/scrape/history` | Scrape history sources only |
 | GET | `/api/articles` | List scraped articles |
 | GET | `/api/post-ideas` | List generated post ideas |
@@ -72,6 +81,14 @@ The web interface provides:
 | GET | `/api/reddit/recommendations` | Get posting recommendations |
 
 ## Architecture
+
+> **Note:** Hyebot now depends on the `armenian-corpus-core` package for
+> shared normalization/contract utilities.  Install it in editable mode by
+> running `pip install -e ../armenian-corpus-core` (see
+> `requirements.txt`).  The scrapers import helpers such as
+> `normalize_text_for_hash` and the analysis code uses common sentiment/title
+> utilities from the core package.
+
 
 ```
 Hye-tasion/

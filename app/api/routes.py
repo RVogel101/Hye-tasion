@@ -115,6 +115,13 @@ def trigger_history_scrape(background_tasks: BackgroundTasks, db: Session = Depe
     return {"status": "scrape started", "type": "history"}
 
 
+@router.get("/scrape/news/sources")
+def available_news_sources():
+    """Return metadata (name/url) for news sources provided by the core package."""
+    from app.scrapers.utils import get_core_news_sources
+    return {"core_sources": get_core_news_sources()}
+
+
 def _bg_scrape_all(db: Session):
     run_all_scrapes(db)
 

@@ -34,6 +34,14 @@ class TestDashboard:
         assert data["articles_scraped"] == 0
         assert data["post_ideas"]["total"] == 0
 
+    def test_core_news_sources_endpoint(self, client, monkeypatch):
+        # simulate core returning two sources
+        monkeypatch.setattr("app.scrapers.utils.get_news_sources", lambda: [{"name": "X", "url": "http://x"}])
+        resp = client.get("/api/scrape/news/sources", headers=HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["core_sources"][0]["name"] == "X"
+
     def test_stats_with_data(self, client, make_source, make_article):
         src = make_source()
         make_article(source=src, title="A1")

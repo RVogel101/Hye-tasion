@@ -39,5 +39,8 @@ rich==13.9.4
 # NLP (lightweight)
 nltk==3.9.1
 
+# core utilities (local editable install)
+-e ../armenian-corpus-core  # points hyebot at the corpus core project
+
 # Testing
 pytest==8.3.4

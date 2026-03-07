@@ -42,28 +42,7 @@ def _extract_features(submission) -> dict:
     }
 
 
-def _simple_sentiment(text: str) -> float:
-    """
-    Minimal rule-based sentiment score (-1.0 to 1.0).
-    Replaced by a real model if NLTK / VADER is available.
-    """
-    try:
-        import nltk
-        from nltk.sentiment.vader import SentimentIntensityAnalyzer
-        try:
-            sid = SentimentIntensityAnalyzer()
-        except LookupError:
-            nltk.download("vader_lexicon", quiet=True)
-            sid = SentimentIntensityAnalyzer()
-        return sid.polarity_scores(text)["compound"]
-    except Exception:
-        pos_words = {"great", "amazing", "historic", "important", "significant",
-                     "victory", "peace", "freedom", "proud", "heritage"}
-        neg_words = {"war", "conflict", "death", "attack", "denial", "massacre",
-                     "crisis", "tragedy", "dispute", "violence"}
-        lower = text.lower()
-        score = sum(1 for w in pos_words if w in lower) - sum(1 for w in neg_words if w in lower)
-        return max(-1.0, min(1.0, score * 0.2))
+from app.analysis.utils import simple_sentiment as _simple_sentiment
 
 
 def collect_reddit_data(
